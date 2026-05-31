@@ -1,5 +1,5 @@
 use eyre::Report;
-use jni::JNIEnv;
+use jni::{jni_sig, jni_str, Env};
 use jni::objects::{JObject};
 use jni::sys::jlong;
 
@@ -12,9 +12,13 @@ pub trait JavaPointers<T> {
     }
 }
 
-pub fn get_pointer_from_field(env: &mut JNIEnv, object: &JObject, field: String) -> Result<jlong, Report> {
-    let field = env.get_field(object, field, "J")?;
+pub fn get_pointer_from_field(env: &mut Env, object: &JObject) -> Result<jlong, Report> {
+    let field = env.get_field(object, jni_str!("pointer"), jni_sig!("J"))?;
     let pointer = field.j()?;
+
+    if pointer == 0 {
+        eyre::bail!("native object is closed or uninitialized");
+    }
 
     Ok(pointer)
 }

@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-eyre = "0.6.8"
-jni = "0.21.1"
-nnnoiseless = "0.5.1"
+eyre = "0.6.12"
+jni = "0.22.4"
+nnnoiseless = "0.5.2"
 
 [lib]
 crate-type = ["cdylib"]
