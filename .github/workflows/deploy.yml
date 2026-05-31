@@ -14,15 +14,15 @@ jobs:
       matrix:
         include:
           - build: linux-x86
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             target: i686-unknown-linux-gnu
 
           - build: linux-x86_64
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
 
           - build: linux-aarch64
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
 
           - build: win-x86
@@ -34,17 +34,17 @@ jobs:
             target: x86_64-pc-windows-msvc
 
           - build: mac-x86_64
-            os: macos-11
+            os: macos-14
             target: x86_64-apple-darwin
 
           - build: mac-aarch64
-            os: macos-11
+            os: macos-14
             target: aarch64-apple-darwin
 
 
     steps:
       - name: Clone repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Get the release version from the tag
         shell: bash
@@ -64,12 +64,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install gcc-i686-linux-gnu libc6-dev-i386 -y
 
       - name: Build
-        uses: actions-rs/cargo@v1
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
-        with:
-          command: build
-          args: --release --target ${{ matrix.target }} --manifest-path rust/Cargo.toml
+        run: cargo build --release --target ${{ matrix.target }} --manifest-path rust/Cargo.toml
 
       - name: Create platform dir
         shell: bash
@@ -80,7 +77,7 @@ jobs:
           mkdir "$dirname"
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             mv "rust/target/${{ matrix.target }}/release/$binary_name.dll" "$dirname"
-          elif [ "${{ matrix.os }}" = "macos-11" ]; then
+          elif [ "${{ matrix.os }}" = "macos-14" ]; then
             mv "rust/target/${{ matrix.target }}/release/lib$binary_name.dylib" "$dirname"
           else
             mv "rust/target/${{ matrix.target }}/release/lib$binary_name.so" "$dirname"
@@ -89,7 +86,7 @@ jobs:
           echo "ASSET=$dirname" >> $GITHUB_ENV
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.build }}
           path: ${{ env.ASSET }}
@@ -101,10 +98,10 @@ jobs:
 
     steps:
       - name: Clone repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v8
         with:
           path: src/main/resources/natives
 
@@ -113,21 +110,22 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v5
         with:
           java-version: 17
           distribution: temurin
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
       - name: Build with Gradle
-        uses: gradle/gradle-build-action@v2
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
-        with:
-          arguments: publish -x test -Pversion=${{ env.VERSION }}
+        run: ./gradlew publish -x test -Pversion=${{ env.VERSION }}
 
       - name: Upload artifact
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             build/libs/rnnoise-jni-rust-${{ env.VERSION }}.jar
