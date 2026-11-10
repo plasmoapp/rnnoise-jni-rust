@@ -77,9 +77,9 @@ jobs:
 
           dirname="src/main/resources/natives/${{ matrix.build }}"
           mkdir "$dirname"
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+          if [ "$RUNNER_OS" = "Windows" ]; then
             mv "rust/target/${{ matrix.target }}/release/$binary_name.dll" "$dirname"
-          elif [ "${{ matrix.os }}" = "macos-14" ]; then
+          elif [ "$RUNNER_OS" = "macOS" ]; then
             mv "rust/target/${{ matrix.target }}/release/lib$binary_name.dylib" "$dirname"
           else
             mv "rust/target/${{ matrix.target }}/release/lib$binary_name.so" "$dirname"
