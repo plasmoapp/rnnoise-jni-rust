@@ -11,9 +11,7 @@ nnnoiseless = "0.5.2"
 [lib]
 crate-type = ["cdylib"]
 
-# https://github.com/johnthagen/min-sized-rust
 [profile.release]
-opt-level = "z"
 lto = true
 codegen-units = 1
 panic = "abort"
