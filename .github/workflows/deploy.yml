@@ -34,17 +34,17 @@ jobs:
             target: x86_64-pc-windows-msvc
 
           - build: mac-x86_64
-            os: macos-14
+            os: macos-15
             target: x86_64-apple-darwin
 
           - build: mac-aarch64
-            os: macos-14
+            os: macos-15
             target: aarch64-apple-darwin
 
 
     steps:
       - name: Clone repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Get the release version from the tag
         shell: bash
@@ -98,7 +98,7 @@ jobs:
 
     steps:
       - name: Clone repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -110,7 +110,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: 17
           distribution: temurin
