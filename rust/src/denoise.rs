@@ -2,8 +2,7 @@ use jni::objects::{JClass, JFloatArray, JObject, JValue};
 use jni::{jni_sig, jni_str, Env, EnvUnowned};
 use jni::errors::ThrowRuntimeExAndDefault;
 use jni::sys::{jfloat, jlong};
-use nnnoiseless::DenoiseState;
-use crate::denoise_container::DenoiseContainer;
+use crate::denoise_container::{frame_count, DenoiseContainer};
 use crate::util::exception::{JavaException, JavaExceptions};
 use crate::util::into_exception::ErrIntoException;
 use crate::util::pointer::{get_pointer_from_field, JavaPointers};
@@ -21,9 +20,19 @@ pub extern "system" fn Java_com_plasmoverse_rnnoise_Denoise_createNative<'local>
 pub extern "system" fn Java_com_plasmoverse_rnnoise_Denoise_processNative<'local>(
     mut env: EnvUnowned<'local>,
     denoise: JObject<'local>,
-    samples: JFloatArray<'local>
-) -> JFloatArray<'local> {
-    env.with_env(|env| denoise_process(env, denoise, samples).or_throw(env))
+    input: JFloatArray<'local>,
+    output: JFloatArray<'local>
+) -> jfloat {
+    env.with_env(|env| denoise_process(env, denoise, input, output).or_throw(env))
+        .resolve::<ThrowRuntimeExAndDefault>()
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_plasmoverse_rnnoise_Denoise_resetNative<'local>(
+    mut env: EnvUnowned<'local>,
+    denoise: JObject<'local>
+) {
+    env.with_env(|env| denoise_reset(env, denoise).or_throw(env))
         .resolve::<ThrowRuntimeExAndDefault>()
 }
 
@@ -38,14 +47,7 @@ pub extern "system" fn Java_com_plasmoverse_rnnoise_Denoise_closeNative<'local>(
 
 
 fn create_denoise_state() -> Result<jlong, JavaException> {
-    let denoise = DenoiseState::new();
-
-    let denoise_container = DenoiseContainer {
-        denoise,
-        first: false
-    };
-
-    Ok(denoise_container.into_jlong_pointer())
+    Ok(DenoiseContainer::default().into_jlong_pointer())
 }
 
 fn get_denoise<'a>(
@@ -67,43 +69,46 @@ fn denoise_close(
 
     let _container = unsafe { Box::from_raw(pointer as *mut DenoiseContainer) };
     env.set_field(&denoise, jni_str!("pointer"), jni_sig!("J"), JValue::from(0 as jlong))
-        .err_into_denoise_exception("Failed set reset pointer".into())?;
+        .err_into_denoise_exception("Failed to reset pointer".into())?;
 
     Ok(())
 }
 
-fn denoise_process<'local>(
-    env: &mut Env<'local>,
-    denoise: JObject<'local>,
-    samples: JFloatArray<'local>
-) -> Result<JFloatArray<'local>, JavaException> {
+fn denoise_reset(
+    env: &mut Env,
+    denoise: JObject
+) -> Result<(), JavaException> {
+    get_denoise(env, &denoise)?.reset();
+
+    Ok(())
+}
+
+fn denoise_process(
+    env: &mut Env,
+    denoise: JObject,
+    input: JFloatArray,
+    output: JFloatArray
+) -> Result<jfloat, JavaException> {
     let container = get_denoise(env, &denoise)?;
 
-    let samples_length = samples.len(env)
-        .err_into_denoise_exception("Failed to get samples array length".into())?;
+    let input_length = input.len(env)
+        .err_into_denoise_exception("Failed to get input array length".into())?;
+    let output_length = if output.is_null() {
+        None
+    } else {
+        Some(output.len(env).err_into_denoise_exception("Failed to get output array length".into())?)
+    };
+    let frames = frame_count(input_length, output_length).map_err(JavaException::new_denoise)?;
 
-    let mut samples_vec = vec![0f64 as jfloat; samples_length];
+    let (probability, processed) = container.process(frames, |samples| {
+        input.get_region(env, 0, samples)
+            .err_into_denoise_exception("Failed to copy input array to rust vec".into())
+    })?;
 
-    samples.get_region(env, 0, &mut samples_vec)
-        .err_into_denoise_exception("Failed to copy samples to rust vec".into())?;
-
-    let mut output = Vec::new();
-    let mut out_buf = [0.0; DenoiseState::FRAME_SIZE];
-
-    for chunk in samples_vec.chunks_exact(DenoiseState::FRAME_SIZE) {
-        container.denoise.process_frame(&mut out_buf[..], chunk);
-
-        if !container.first {
-            output.extend_from_slice(&out_buf[..]);
-        }
-        container.first = false;
+    if !output.is_null() {
+        output.set_region(env, 0, processed)
+            .err_into_denoise_exception("Failed to copy processed samples into output array".into())?;
     }
 
-    let output_java = env.new_float_array(output.len())
-        .err_into_denoise_exception("Failed to create java float array".into())?;
-
-    output_java.set_region(env, 0, &output)
-        .err_into_denoise_exception("Failed to copy float vec into java float array".into())?;
-
-    Ok(output_java)
+    Ok(probability)
 }

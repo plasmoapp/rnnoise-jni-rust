@@ -17,12 +17,26 @@ dependencies {
 ### Usage
 Sample code from [DenoiseTest.java](https://github.com/plasmoapp/rnnoise-jni-rust/blob/main/src/test/java/com/plasmoverse/rnnoise/DenoiseTest.java)
 ```java
-// Creates a new RNNoise instance.
+// Creates a new RNNoise instance
 Denoise denoise = Denoise.create();
 
-// Processes the samples. Samples should be in 16-bit, 48kHz signed PCM format.
-float[] processed = denoise.process(new float[960]);
+// 960 is one 20 ms frame
+float[] input = new float[960];
+float[] output = new float[960];
 
-// Closes the RNNoise instance, releasing allocated resources.
+// Writes the denoised samples to output and returns the voice probability, from 0 to 1
+float probability = denoise.process(input, output);
+
+// Only returns the voice probability
+probability = denoise.process(input, null);
+
+// Returns the denoised samples in a new array
+float[] processed = denoise.process(input);
+
+// Clears the state, as if the instance was just created
+denoise.reset();
+
+// Closes the RNNoise instance, releasing allocated resources
+denoise.close();
 denoise.close();
 ```
