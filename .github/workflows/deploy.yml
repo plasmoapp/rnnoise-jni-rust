@@ -109,10 +109,12 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-      - name: Set up JDK 17
+      - name: Set up JDK
         uses: actions/setup-java@v6
         with:
-          java-version: 17
+          java-version: |
+            8
+            17
           distribution: temurin
 
       - name: Set up Gradle
